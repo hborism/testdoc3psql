@@ -28,138 +28,7 @@ app.config['UPLOAD_FOLDER'] = '/usr/src/app/profilepictures'
 db = SQLAlchemy(app)
 
 
-
-'''
----------------------------------------------------------------------
- ____        _        _                    __  __           _      _
-|  _ \  __ _| |_ __ _| |__   __ _ ___  ___|  \/  | ___   __| | ___| |
-| | | |/ _` | __/ _` | '_ \ / _` / __|/ _ \ |\/| |/ _ \ / _` |/ _ \ |
-| |_| | (_| | || (_| | |_) | (_| \__ \  __/ |  | | (_) | (_| |  __/ |
-|____/ \__,_|\__\__,_|_.__/ \__,_|___/\___|_|  |_|\___/ \__,_|\___|_|
----------------------------------------------------------------------
-'''
-
-class Club(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(50))
-
-    def __init__(self, name):
-        self.name = name
-
-    def __repr__(self):
-        return '<Club %r>' % self.name
-
-
-
-class Player(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    first_name = db.Column(db.String(30))
-    last_name = db.Column(db.String(40))
-    email = db.Column(db.String(120), unique=True)
-    hcp = db.Column(db.Integer)
-    profile_picture_id = db.Column(db.String(36), unique=True)
-    club_id = db.Column(db.Integer, db.ForeignKey('club.id'))
-    access_token = db.Column(db.String(42))
-    password = db.Column(db.String(50))
-    created = db.Column(db.DateTime, default=datetime.now)
-
-
-    def __init__(self, first_name, last_name, email, hcp, profile_picture_id, club_id, access_token, password):
-        self.first_name = first_name
-        self.last_name = last_name
-        self.email = email
-        self.hcp = hcp
-        self.profile_picture_id = profile_picture_id
-        self.club_id = club_id
-        self.access_token = access_token
-        self.password = password
-
-    def __repr__(self):
-        return '<Player %r>' % self.email
-
-
-
-class Course(db.Model):
-	id = db.Column(db.Integer, primary_key=True)
-	name = db.Column(db.String(40))
-	number_of_holes = db.Column(db.Integer)
-	club_id = db.Column(db.Integer, db.ForeignKey('club.id'))
-
-	def __init__(self, name, number_of_holes, club_id):
-		self.name = name
-		self.number_of_holes = number_of_holes
-		self.club_id = club_id
-
-	def __repr__(self):
-		return '<Course %r>' % self.name
-
-
-
-class Hole(db.Model):
-    tee_no = db.Column(db.Integer, primary_key=True)
-    course_id = db.Column(db.Integer, db.ForeignKey('course.id'), primary_key=True)
-    par = db.Column(db.Integer)
-    index = db.Column(db.Integer)
-    red_tee = db.Column(db.Integer)
-    blue_tee = db.Column(db.Integer)
-    yellow_tee = db.Column(db.Integer)
-    white_tee = db.Column(db.Integer)
-
-    def __init__(self, tee_no, course_id, par, index, red_tee, blue_tee, yellow_tee, white_tee):
-        self.tee_no = tee_no
-        self.course_id = course_id
-        self.par = par
-        self.index = index
-        self.red_tee = red_tee
-        self.blue_tee = blue_tee
-        self.yellow_tee = yellow_tee
-        self.white_tee = white_tee
-
-    def __repr__(self):
-        return '<Hole %r>' % self.tee_no
-
-
-
-class Round(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    course_id = db.Column(db.Integer, db.ForeignKey('course.id'))
-    created_by_player_id = db.Column(db.Integer, db.ForeignKey('player.id'))
-    timestamp = db.Column(db.DateTime, default=datetime.now)
-
-    def __init__(self, course_id, created_by_player_id):
-        self.course_id = course_id
-        self.created_by_player_id = created_by_player_id
-
-    def __repr__(self):
-        return '<Round %r>' % self.id
-
-
-
-class Score(db.Model):
-    round_id = db.Column(db.Integer, db.ForeignKey('round.id'), primary_key=True)
-    player_id = db.Column(db.Integer, db.ForeignKey('player.id'), primary_key=True)
-
-    def __init__(self, round_id, player_id):
-        self.round_id = round_id
-        self.player_id = player_id
-
-
-
-'''CAREFUL HERE: since hole_no is not a foreign key to hole.hole_no and hole.course_id
-it might be possible to add scores to holes that do not exist if not careful'''
-class ScoreHole(db.Model):
-    round_id = db.Column(db.Integer, db.ForeignKey('round.id'), primary_key=True)
-    player_id = db.Column(db.Integer, db.ForeignKey('player.id'), primary_key=True)
-    hole_no = db.Column(db.Integer, primary_key=True)
-    shots = db.Column(db.Integer, nullable=False)
-
-    def __init__(self, round_id, player_id, hole_no, shots):
-        self.round_id = round_id
-        self.player_id = player_id
-        self.hole_no = hole_no
-        self.shots = shots
-
-
+from models import *
 
 '''
 --------------------------------------------
@@ -230,17 +99,7 @@ def get_pitcure(pictureId):
 
 
 
-'''NEW CLUB
-is done directly in database, ie no API for this function
-'''
-
-
-'''
-NEW Course
-is done directly in database, ie no API for this function
-'''
-
-'''--------------------------------------------------------------
+'''----------------------------------------------------------------------------------
 LOGIN WITH EMAIL
 JSONinput: email, password
 JSONoutput: backend access token
@@ -258,7 +117,7 @@ def loginwithemail():
     else:
         return jsonify({"error":"login failed", "message":"username and password did not match"}), 422
 
-'''--------------------------------------------------------------
+'''----------------------------------------------------------------------------------------
 REGISTER WITH EMAIL
 JSONinput: first_name, last_name, hcp, club_id, password, email
 JSONoutput:
@@ -309,7 +168,7 @@ def generateAccessToken():
 LOGIN WITH FACEBOOK
 JSONinput: facebook access token
 JSONoutput: backend access token
-NOTCOMPLETE ORCHECKED IF OK!
+NOTCOMPLETE ORCHECKED!
 '''
 @app.route('/loginwithfacebook', methods=['POST'])
 def loginwithfacebook():
@@ -380,7 +239,7 @@ def newscore():
 
 
 
-'''
+'''-------------------------------------------------------------------------------
 NEW SCOREHOLE
 JSONinput: round_id, player_id, hole_id, shots
 JSONoutput: ---------
@@ -396,37 +255,76 @@ def scorehole():
         return "integrity error", 502
 
 
-
-
+'''-------------------------------------------------------------------------------
+GET ME INFO and UPDATe INFO
+HEADERinput: Access-token
+JSON: all info about oneself
 '''
-ACCESS TOKEN PLAYGROUND
+@app.route("/me")
+def me():
+    token = request.headers.get('Access-token')
+    player=Player.query.filter_by(access_token=token).first()
+    if player is None:
+        return jsonify({"error": {"message":"There exist no user with that access token. please login", "type":"not found"}}),400
+
+    club=Club.query.filter_by(id=player.club_id).first()
+    return jsonify({"first_name":player.first_name, "last_name":player.last_name, "hcp":player.hcp, "club_id":player.club_id, "club_name":club.name, "email":player.email})
+
+
+'''----------------------------------------------------------------------------------
+CHANGE HCP
 '''
-@app.route('/accesstoken', methods=['POST'])
-def accesstoken():
-    token=request.json['access_token']
-    return jsonify({"access_token": {"message": "success!", "uploaded_access_token": token}})
+@app.route("/me/hcp", methods=['POST'])
+def changeHCP():
+    token = request.headers.get('Access-token')
+    player=Player.query.filter_by(access_token=token).first()
+    if player is None:
+        return jsonify({"error": {"message":"There exist no user with that access token. please login", "type":"not found"}}),400
+
+    player.hcp = request.json["hcp"]
+    db.session.commit()
+    return jsonify({"message":"Success!", "new_hcp":player.hcp}),200
 
 
-
-
-'''
+'''--------------------------------------------------------------------------------
 GET player info
 '''
 @app.route("/player/<int:player_id>")
 def player(player_id):
-    player = Player.query.filter_by(id=player_id).first()
-    if player is None:
-        return jsonify({"error": {"message":"There exist no user with that id", "type":"not found"}})
-    else:
-        return jsonify({"player": player.id})
+    token=request.headers.get('Access-token')
+    client_player=Player.query.filter_by(access_token=token).first()
+    if client_player is None:
+        return jsonify({"error": {"message":"There exist no user with that access token. please login", "type":"not found"}}),400
 
+    friend = Friends.query.filter_by(id1=client_player.id,id2=player_id).first()
+
+    if friend is None:
+        return jsonify({"error": {"message":"Since you are not friend with player of that id you are now allowed to see the players info", "type":"not friend"}}),400
+    else:
+        player=Player.query.filter_by(id=player_id).first()
+        club=Club.query.filter_by(id=player.club_id).first()
+        return jsonify({"first_name": player.first_name, "last_name":player.last_name, "hcp":player.hcp, "club_id":player.club_id, "club_name":club.name, "profile_picture_id":player.profile_picture_id})
+
+
+
+
+'''----------------------------------------------------------------------------------
+CHECK IF friends
+
+def getFriends(player_id):
+    friends = Friends.query.filter_by(id1=player_id).all()
+    return jsonify({"friends": friends})
+'''
 
 
 #-----------------------------OLD stuff: replace with functions using psql database----------------------------
 
 @app.route('/', methods=['GET'])
 def index():
-    return jsonify({"info":info})
+    user= request.args.get('user')
+    token = request.headers.get('Access-token')
+    other = request.headers.get('otherkey')
+    return jsonify({"info":info, "access token":token, "other key":other, "user":user})
 
 
 
