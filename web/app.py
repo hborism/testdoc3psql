@@ -1,6 +1,8 @@
 import os
 import uuid
 import datetime
+import urllib.request
+import json
 from flask import Flask
 from flask import request, render_template, jsonify, send_file, redirect, url_for
 from flask_sqlalchemy import SQLAlchemy
@@ -57,14 +59,20 @@ class Player(db.Model):
     hcp = db.Column(db.Integer)
     profile_picture_id = db.Column(db.String(36), unique=True)
     club_id = db.Column(db.Integer, db.ForeignKey('club.id'))
+    access_token = db.Column(db.String(42))
+    password = db.Column(db.String(50))
+    created = db.Column(db.DateTime, default=datetime.now)
 
-    def __init__(self, first_name, last_name, email, hcp, profile_picture_id, club_id):
+
+    def __init__(self, first_name, last_name, email, hcp, profile_picture_id, club_id, access_token, password):
         self.first_name = first_name
         self.last_name = last_name
         self.email = email
         self.hcp = hcp
         self.profile_picture_id = profile_picture_id
         self.club_id = club_id
+        self.access_token = access_token
+        self.password = password
 
     def __repr__(self):
         return '<Player %r>' % self.email
@@ -232,21 +240,108 @@ NEW Course
 is done directly in database, ie no API for this function
 '''
 
+'''--------------------------------------------------------------
+LOGIN WITH EMAIL
+JSONinput: email, password
+JSONoutput: backend access token
+'''
+@app.route('/loginwithemail', methods=['POST'])
+def loginwithemail():
+    email = request.json["email"]
+    password = request.json["password"]
+    player = Player.query.filter_by(email=email).first()
+    if player is None:
+        return jsonify({"error":"login failed", "message":"username and password did not match"}), 422
 
+    if (player.password == password):
+        return jsonify({"access_token":player.access_token, "message":"login successful"}), 200
+    else:
+        return jsonify({"error":"login failed", "message":"username and password did not match"}), 422
+
+'''--------------------------------------------------------------
+REGISTER WITH EMAIL
+JSONinput: first_name, last_name, hcp, club_id, password, email
+JSONoutput:
 '''
-NEW PLAYER
-JSONinput: first_name, last_name, email, hcp, club_id
-JSONoutput: ---
+@app.route('/registerwithemail', methods=['POST'])
+def registerwithemail():
+    email = request.json["email"]
+    password = request.json["password"]
+    first_name = request.json["first_name"]
+    last_name = request.json["last_name"]
+    hcp = request.json["hcp"]
+    club_id = request.json["club_id"]
+
+    player = Player.query.filter_by(email=email).first()
+    if player is not None:
+        return jsonify({"error":"user with that email aldready exists", "message":"please enter another email or login"}),422
+    else:
+        return createPlayer(first_name, last_name, email, hcp, None, club_id, password, None)
+
+'''------------------------------------------------------------------
+CREATEPLAYER
 '''
-@app.route('/newplayer', methods=['POST'])
-def newuser():
-	newplayer=Player(request.json["first_name"], request.json["last_name"],request.json["email"],request.json["hcp"], None, request.json["club_id"])
-	try:
-		db.session.add(newplayer)
-		db.session.commit()
-		return ("Player entered into database"), 200
-	except exc.IntegrityError:
-		return "integrity error", 502
+#need to add friends later!!!
+def createPlayer(first_name, last_name, email, hcp, profile_picture_id, club_id, password, friends):
+    access_token = generateAccessToken()
+    newplayer=Player(first_name, last_name, email, hcp, profile_picture_id, club_id, access_token, password)
+    try:
+        db.session.add(newplayer)
+        db.session.commit()
+        return jsonify({"message":"Player added successfully to the database","access_token":newplayer.access_token}), 200
+    except exc.IntegrityError:
+        return jsonify({"error":"serverside error", "message":"Could not add player to database"}), 502
+
+
+'''------------------------------------------------------------------
+GENERATE ACCESSTOKEN
+'''
+def generateAccessToken():
+    access_token = str(uuid.uuid4())
+    while Player.query.filter_by(access_token=access_token).first() is not None:
+        access_token = str(uuid.uuid4())
+
+    return access_token;
+
+
+
+'''--------------------------------------------------------------
+LOGIN WITH FACEBOOK
+JSONinput: facebook access token
+JSONoutput: backend access token
+NOTCOMPLETE ORCHECKED IF OK!
+'''
+@app.route('/loginwithfacebook', methods=['POST'])
+def loginwithfacebook():
+
+    '''get facebook info'''
+    facebookToken = request.json["access_token"]
+    url="https://graph.facebook.com/me?fields=first_name,last_name,email,friends&access_token="+facebookToken
+    try:
+        resonse = urllib.request.urlopen(url)
+        data=response.read().decode("utf-8")
+        datajson=json.loads(data)
+    except urllib.error.HTTPError:
+        return "error", 400
+
+    '''check to see if email is present in database
+    if present then send back access token to give access
+    if not present then create new player and issue access token'''
+    player = Player.query.filter_by(email=datajson['email']).first()
+    if player is not None:
+        return jsonify({"access_token":player.access_token})
+    else:
+        #try and get facebook profile picture and save it. If fails then profile_picture_id is set to None
+        try:
+            picture=urllib.request.urlopen("https://graph.facebook.com/me/picture?height=400&width=400&type=normal&access_token="+facebookToken)
+            profile_picture_id = str(uuid.uuid4())+".jpg"
+            output= open("profilepictures/"+profile_picture_id, "wb")
+            output.write(picture.read())
+            output.close()
+        except:
+            profile_picture_id=None
+
+        return createPlayer(datajson["first_name"], datajson["last_name"], datajson["email"], None, profile_picture_id, None, None, datajson["friends"])
 
 
 
@@ -303,7 +398,27 @@ def scorehole():
 
 
 
+'''
+ACCESS TOKEN PLAYGROUND
+'''
+@app.route('/accesstoken', methods=['POST'])
+def accesstoken():
+    token=request.json['access_token']
+    return jsonify({"access_token": {"message": "success!", "uploaded_access_token": token}})
 
+
+
+
+'''
+GET player info
+'''
+@app.route("/player/<int:player_id>")
+def player(player_id):
+    player = Player.query.filter_by(id=player_id).first()
+    if player is None:
+        return jsonify({"error": {"message":"There exist no user with that id", "type":"not found"}})
+    else:
+        return jsonify({"player": player.id})
 
 
 
@@ -313,14 +428,7 @@ def scorehole():
 def index():
     return jsonify({"info":info})
 
-@app.route("/user/<int:userId>")
-def user(userId):
-	if userId==1:
-		return jsonify({"userInfo":henrik})
-	if userId==2:
-		return jsonify({"userInfo":axel})
-	else:
-		return jsonify({"error": {"message":"There exist no user with that id", "type":"not found"}})
+
 
 @app.route("/scorecard/<int:scoreCardId>", methods=['GET'])
 def scoreCard(scoreCardId):
