@@ -1,6 +1,8 @@
 import datetime
 from datetime import datetime
 from app import db
+from flask import jsonify
+import json
 
 '''
 ---------------------------------------------------------------------
@@ -21,7 +23,10 @@ class Club(db.Model):
         self.name = name
 
     def __repr__(self):
-        return '<Club %r>' % self.name
+        return {"id":self.id, "name":self.name}
+
+    def serialize(self):
+        return {"id":self.id, "name":self.name}
 
 
 

@@ -1,3 +1,10 @@
+import sqlalchemy
+from sqlalchemy import *
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker
+
+
+
 import os
 import uuid
 import datetime
@@ -110,12 +117,12 @@ def loginwithemail():
     password = request.json["password"]
     player = Player.query.filter_by(email=email).first()
     if player is None:
-        return jsonify({"error":"login failed", "message":"username and password did not match"}), 422
+        return jsonify({"error":"login failed", "message":"username and password did not match", "status":422}), 422
 
     if (player.password == password):
-        return jsonify({"access_token":player.access_token, "message":"login successful"}), 200
+        return jsonify({"access_token":player.access_token, "message":"login successful", "status":200}), 200
     else:
-        return jsonify({"error":"login failed", "message":"username and password did not match"}), 422
+        return jsonify({"error":"login failed", "message":"username and password did not match", "status":422}), 422
 
 '''----------------------------------------------------------------------------------------
 REGISTER WITH EMAIL
@@ -133,7 +140,7 @@ def registerwithemail():
 
     player = Player.query.filter_by(email=email).first()
     if player is not None:
-        return jsonify({"error":"user with that email aldready exists", "message":"please enter another email or login"}),422
+        return jsonify({"error":"user with that email aldready exists", "message":"please enter another email or login", "status":422}),422
     else:
         return createPlayer(first_name, last_name, email, hcp, None, club_id, password, None)
 
@@ -147,9 +154,9 @@ def createPlayer(first_name, last_name, email, hcp, profile_picture_id, club_id,
     try:
         db.session.add(newplayer)
         db.session.commit()
-        return jsonify({"message":"Player added successfully to the database","access_token":newplayer.access_token}), 200
+        return jsonify({"message":"Player added successfully to the database","access_token":newplayer.access_token, "status":200}), 200
     except exc.IntegrityError:
-        return jsonify({"error":"serverside error", "message":"Could not add player to database"}), 502
+        return jsonify({"error":"serverside error", "message":"Could not add player to database", "status":502}), 502
 
 
 '''------------------------------------------------------------------
@@ -265,10 +272,10 @@ def me():
     token = request.headers.get('Access-token')
     player=Player.query.filter_by(access_token=token).first()
     if player is None:
-        return jsonify({"error": {"message":"There exist no user with that access token. please login", "type":"not found"}}),400
+        return jsonify({"error": "There exist no user with that access token. please login", "type":"not found", "status":400}),400
 
     club=Club.query.filter_by(id=player.club_id).first()
-    return jsonify({"first_name":player.first_name, "last_name":player.last_name, "hcp":player.hcp, "club_id":player.club_id, "club_name":club.name, "email":player.email})
+    return jsonify({"first_name":player.first_name, "last_name":player.last_name, "hcp":player.hcp, "club_id":player.club_id, "club_name":club.name, "email":player.email, "status":200}),200
 
 
 '''----------------------------------------------------------------------------------
@@ -279,7 +286,7 @@ def changeHCP():
     token = request.headers.get('Access-token')
     player=Player.query.filter_by(access_token=token).first()
     if player is None:
-        return jsonify({"error": {"message":"There exist no user with that access token. please login", "type":"not found"}}),400
+        return jsonify({"error": "There exist no user with that access token. please login", "type":"not found", "status":400}),400
 
     player.hcp = request.json["hcp"]
     db.session.commit()
@@ -294,18 +301,29 @@ def player(player_id):
     token=request.headers.get('Access-token')
     client_player=Player.query.filter_by(access_token=token).first()
     if client_player is None:
-        return jsonify({"error": {"message":"There exist no user with that access token. please login", "type":"not found"}}),400
+        return jsonify({"error": "There exist no user with that access token. please login", "type":"not found", "status":400}),400
 
     friend = Friends.query.filter_by(id1=client_player.id,id2=player_id).first()
 
     if friend is None:
-        return jsonify({"error": {"message":"Since you are not friend with player of that id you are now allowed to see the players info", "type":"not friend"}}),400
+        return jsonify({"error":"Since you are not friend with player of that id you are now allowed to see the players info", "type":"not friend", "status":400}),400
     else:
         player=Player.query.filter_by(id=player_id).first()
         club=Club.query.filter_by(id=player.club_id).first()
-        return jsonify({"first_name": player.first_name, "last_name":player.last_name, "hcp":player.hcp, "club_id":player.club_id, "club_name":club.name, "profile_picture_id":player.profile_picture_id})
+        return jsonify({"first_name": player.first_name, "last_name":player.last_name, "hcp":player.hcp, "club_id":player.club_id, "club_name":club.name, "profile_picture_id":player.profile_picture_id, "status":200})
 
 
+'''----------------------------------------------------------------------------------
+GET CLUBS
+'''
+@app.route('/getclubs', methods=['GET'])
+def getClubs():
+    result = Club.query.order_by(Club.name).all()
+    clubs=[row.serialize() for row in result]
+    return jsonify({"status":200, "clubs":clubs})
+        #return jsonify({"data":[{"hello":"bye","whatever":"cool"},{"key2":"one value"}]})
+        # explanation here: http://stackoverflow.com/questions/7102754/jsonify-a-sqlalchemy-result-set-in-flask
+        # and here: http://stackoverflow.com/questions/5022066/how-to-serialize-sqlalchemy-result-to-json
 
 
 '''----------------------------------------------------------------------------------
