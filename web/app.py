@@ -17,7 +17,7 @@ from datetime import datetime
 from sqlalchemy import exc
 from werkzeug.utils import secure_filename
 
-info= {"header":"Social golf app by Axel and Boris" ,"body": "An app developed for further enhancing the experience of the wonderful game of golf"}
+info= {"status":200, "header":"Social golf app by Axel and Boris" ,"body": "An app developed for further enhancing the experience of the wonderful game of golf"}
 henrik={"id":1, "firstName": "Henrik", "lastName": "Boris-Möller", "hcp": 8.8, "club": "Wasa GK"}
 axel = {"id":2, "firstName": "Axel", "lastName": "Sundberg", "hcp": 4.8, "club": "Båstad GK"}
 card= {"id":1, "course":"LAGK", "timestamp": "14.30 2016-06-12", "score": {1:None, 2:None, 3:None}, "ForImprovementInfo":"Instead of score:(...) we will in the future have (player1:((playerId:1... (score: () etc"}
@@ -27,8 +27,8 @@ ALLOWED_EXTENSIONS = set(['png', 'jpg', 'jpeg', 'gif'])
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://postgres:postgres@postgres:5432/postgres'
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS']=False
 #app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://{db_user}:{db_password}@{db_service}:{db_port}/{db_name}
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS']=False
 app.config['UPLOAD_FOLDER'] = '/usr/src/app/profilepictures'
 
 
@@ -47,22 +47,35 @@ from models import *
 --------------------------------------------
 '''
 
-# @app.route('/upload', methods=['GET', 'POST'])
-# def upload():
-#     # if request.method == 'POST':
-#         # file = request.files['file']
-#         # extension = os.path.splitext(file.filename)[1]
-#         # f_name = str(uuid.uuid4()) + extension
-#         # file.save(os.path.join(app.config['UPLOAD_FOLDER'], f_name))
-#         # return json.dumps({'filename':f_name})
-#     return "use POST request"
-#
-# def allowed_file(filename):
-#     return '.' in filename and \
-#            filename.rsplit('.', 1)[1] in ALLOWED_EXTENSIONS
-
-
+'''---------------------------------------------------------------------------
+ERRORS
 '''
+
+@app.errorhandler(404)
+def page_not_found(e):
+    return jsonify({"error":'unknown 404-error', "message":"unknown reason. Please check backend", "status":404}), 404
+
+@app.errorhandler(501)
+def page_not_found(e):
+    return jsonify({"error":'unknown 501-error', "message":"unknown reason. Please check backend", "status":510}), 510
+
+@app.errorhandler(502)
+def page_not_found(e):
+    return jsonify({"error":'unknown 502-error', "message":"unknown reason. Please check backend", "status":510}), 510
+
+@app.errorhandler(503)
+def page_not_found(e):
+    return jsonify({"error":'unknown 503-error', "message":"unknown reason. Please check backend", "status":510}), 510
+
+@app.errorhandler(504)
+def page_not_found(e):
+    return jsonify({"error":'unknown 504-error', "message":"unknown reason. Please check backend", "status":510}), 510
+
+@app.errorhandler(500)
+def page_not_found(e):
+    return jsonify({"error":'unknown 500-error', "message":"unknown reason. Please check backend", "status":510}), 510
+
+'''-----------------------------------------------------------------------------
 UPLOAD PICTURE
 work in progress. currently only possible to upload via the html page
 '''
@@ -92,7 +105,22 @@ def upload_file():
     </form>
     '''
 
-'''
+# @app.route('/upload', methods=['GET', 'POST'])
+# def upload():
+#     # if request.method == 'POST':
+#         # file = request.files['file']
+#         # extension = os.path.splitext(file.filename)[1]
+#         # f_name = str(uuid.uuid4()) + extension
+#         # file.save(os.path.join(app.config['UPLOAD_FOLDER'], f_name))
+#         # return json.dumps({'filename':f_name})
+#     return "use POST request"
+#
+# def allowed_file(filename):
+#     return '.' in filename and \
+#            filename.rsplit('.', 1)[1] in ALLOWED_EXTENSIONS
+
+
+'''----------------------------------------------------------------------------
 GET PICTURE
 get the picture of specific name (including .jpg or .png etc)
 '''
@@ -117,12 +145,12 @@ def loginwithemail():
     password = request.json["password"]
     player = Player.query.filter_by(email=email).first()
     if player is None:
-        return jsonify({"error":"login failed", "message":"username and password did not match", "status":422}), 422
+        return jsonify({"error":"login failed", "message":"email does not exist", "status":400}), 400
 
     if (player.password == password):
         return jsonify({"access_token":player.access_token, "message":"login successful", "status":200}), 200
     else:
-        return jsonify({"error":"login failed", "message":"username and password did not match", "status":422}), 422
+        return jsonify({"error":"login failed", "message":"email and password did not match", "status":401}), 401
 
 '''----------------------------------------------------------------------------------------
 REGISTER WITH EMAIL
@@ -136,30 +164,30 @@ def registerwithemail():
     first_name = request.json["first_name"]
     last_name = request.json["last_name"]
     hcp = request.json["hcp"]
-    club_id = request.json["club_id"]
+    club_name = request.json["club_name"]
 
     player = Player.query.filter_by(email=email).first()
     if player is not None:
-        return jsonify({"error":"user with that email aldready exists", "message":"please enter another email or login", "status":422}),422
+        return jsonify({"error":"user with that email aldready exists", "message":"please enter another email or login", "status":400}),400
     else:
-        return createPlayer(first_name, last_name, email, hcp, None, club_id, password, None)
+        return createPlayer(first_name, last_name, email, hcp, None, None, club_name, password, None)
 
-'''------------------------------------------------------------------
+'''----------------------------------------------------------------------------
 CREATEPLAYER
 '''
 #need to add friends later!!!
-def createPlayer(first_name, last_name, email, hcp, profile_picture_id, club_id, password, friends):
+def createPlayer(first_name, last_name, email, hcp, profile_picture_id, cover_picture_id, club_name, password, friends):
     access_token = generateAccessToken()
-    newplayer=Player(first_name, last_name, email, hcp, profile_picture_id, club_id, access_token, password)
+    newplayer=Player(first_name, last_name, email, hcp, profile_picture_id, cover_picture_id, club_name, access_token, password)
     try:
         db.session.add(newplayer)
         db.session.commit()
         return jsonify({"message":"Player added successfully to the database","access_token":newplayer.access_token, "status":200}), 200
     except exc.IntegrityError:
-        return jsonify({"error":"serverside error", "message":"Could not add player to database", "status":502}), 502
+        return jsonify({"error":"serverside error", "message":"Could not add player to database", "status":500}), 500
 
 
-'''------------------------------------------------------------------
+'''-----------------------------------------------------------------------------
 GENERATE ACCESSTOKEN
 '''
 def generateAccessToken():
@@ -171,7 +199,7 @@ def generateAccessToken():
 
 
 
-'''--------------------------------------------------------------
+'''---------------------------------------------------------------------------
 LOGIN WITH FACEBOOK
 JSONinput: facebook access token
 JSONoutput: backend access token
@@ -210,9 +238,12 @@ def loginwithfacebook():
         return createPlayer(datajson["first_name"], datajson["last_name"], datajson["email"], None, profile_picture_id, None, None, datajson["friends"])
 
 
-
-
+'''---------------------------------------------------------------------------
+NEW FRIEND
 '''
+
+
+'''----------------------------------------------------------------------------
 NEW ROUND
 JSONinput: course_id, player_id
 JSONoutput: ---
@@ -263,19 +294,32 @@ def scorehole():
 
 
 '''-------------------------------------------------------------------------------
-GET ME INFO and UPDATe INFO
+GET My INFO and UPDATe INFO
 HEADERinput: Access-token
 JSON: all info about oneself
 '''
-@app.route("/me")
+@app.route("/getmyprofileinfo")
 def me():
     token = request.headers.get('Access-token')
     player=Player.query.filter_by(access_token=token).first()
     if player is None:
-        return jsonify({"error": "There exist no user with that access token. please login", "type":"not found", "status":400}),400
+        return jsonify({"error": "There exist no user with that access token. please login", "message":"not found", "status":400}),400
 
     club=Club.query.filter_by(id=player.club_id).first()
-    return jsonify({"first_name":player.first_name, "last_name":player.last_name, "hcp":player.hcp, "club_id":player.club_id, "club_name":club.name, "email":player.email, "status":200}),200
+    return jsonify({"first_name":player.first_name, "last_name":player.last_name, "hcp":player.hcp, "club_id":player.club_id, "club_name":club.name, "club_id":club.id, "email":player.email, "status":200}),200
+
+'''-----------------------------------------------------------------------------
+GET MY STATS
+'''
+@app.route("/getmystats")
+def mystats():
+    token = request.headers.get('Access-token')
+    player=Player.query.filter_by(access_token=token).first()
+    if player is None:
+        return jsonify({"error": "There exist no user with that access token. please login", "message":"not found", "status":400}),400
+
+    club=Club.query.filter_by(id=player.club_id).first()
+    return jsonify({"avg_score": player.avg_score, "par_streak":player.par_streak, "birdie_streak":player.birdie_streak, "best_club": club.name, "best_club_id":club.id, "best_hole":player.best_hole})
 
 
 '''----------------------------------------------------------------------------------
@@ -285,12 +329,13 @@ CHANGE HCP
 def changeHCP():
     token = request.headers.get('Access-token')
     player=Player.query.filter_by(access_token=token).first()
+
     if player is None:
-        return jsonify({"error": "There exist no user with that access token. please login", "type":"not found", "status":400}),400
+        return jsonify({"error": "There exist no user with that access token. please login", "message":"not found", "status":400}),400
 
     player.hcp = request.json["hcp"]
     db.session.commit()
-    return jsonify({"message":"Success!", "new_hcp":player.hcp}),200
+    return jsonify({"message":"Success!", "new_hcp":player.hcp, "status":200}),200
 
 
 '''--------------------------------------------------------------------------------
@@ -324,6 +369,30 @@ def getClubs():
         #return jsonify({"data":[{"hello":"bye","whatever":"cool"},{"key2":"one value"}]})
         # explanation here: http://stackoverflow.com/questions/7102754/jsonify-a-sqlalchemy-result-set-in-flask
         # and here: http://stackoverflow.com/questions/5022066/how-to-serialize-sqlalchemy-result-to-json
+
+
+'''------------------------------------------------------------------------------------
+GET FREINDS
+'''
+@app.route('/getfriends', methods=['GET'])
+def getFriends():
+    # player_email=request.headers.get('Player-email')
+    # result = Friend.query.filter_by(email1=player_email).all()
+    # friends=[row.serialize() for row in result]
+    # return jsonify({"status":200, "friends":friends})
+
+    a = db.aliased(Player, name='Player')
+
+    token = request.headers.get('Access-token')
+    playerList = Friend.query.join(Player, Friend.email2==Player.email).join(a, Friend.email1==a.email).add_columns(Player.first_name, Player.last_name).filter(a.access_token == token).all()
+    # playerList = Player.query.join(Friend, Player.email==Friend.email2).add_columns(Player.first_name, Player.last_name, Player.email).all()
+    # .filter(Player.email == Friend.email1).filter(Player.access_token == token).all()
+    friends=[{"first_name":row.first_name} for row in playerList]
+    return jsonify({"status":200, "friends":friends})
+
+# userList = users.query.join(friendships, users.id==friendships.user_id).add_columns(users.userId, users.name, users.email, friends.userId, friendId).filter(users.id == friendships.friend_id).filter(friendships.user_id == userID)
+    #q = db.session.query(Player).join(Player, Friends.id1==Player.id).first()
+    # result = Friends.query.join(Player, Friends.id1==Player.id).first()
 
 
 '''----------------------------------------------------------------------------------
