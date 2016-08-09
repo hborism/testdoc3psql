@@ -238,6 +238,40 @@ def loginwithfacebook():
         return createPlayer(datajson["first_name"], datajson["last_name"], datajson["email"], None, profile_picture_id, None, None, datajson["friends"])
 
 
+'''------------------------------------------------------------------------------------
+GET FREINDS
+'''
+@app.route('/getfriends', methods=['GET'])
+def getFriends():
+    a = db.aliased(Player, name='Player')
+    token = request.headers.get('Access-token')
+    playerList = Friend.query.join(Player, Friend.id2==Player.id).join(a, Friend.id1==a.id).add_columns(Player.id, Player.first_name, Player.last_name, Player.hcp, Player.club_name, Player.profile_picture_id, Player.cover_picture_id).filter(a.access_token == token).all()
+
+    if not playerList:
+        player = Player.query.filter_by(access_token=token).first()
+        if player is None:
+            return jsonify({"status":400, "error":"No player with that accesstoken", "message":"Please enter a valid access-token"}),400
+
+    friends=[{"id":row.id, "first_name":row.first_name, "last_name":row.last_name, "hcp":row.hcp, "club_name":row.club_name, "profile_picture_id":row.profile_picture_id, "cover_picture_id":row.cover_picture_id} for row in playerList]
+    return jsonify({"status":200, "friends":friends})
+
+
+
+'''----------------------------------------------------------------------------------
+GET CLUBS
+'''
+@app.route('/getclubs', methods=['GET'])
+def getClubs():
+    result = Club.query.order_by(Club.name).all()
+    clubs=[row.serialize() for row in result]
+    return jsonify({"status":200, "clubs":clubs})
+        #return jsonify({"data":[{"hello":"bye","whatever":"cool"},{"key2":"one value"}]})
+        # explanation here: http://stackoverflow.com/questions/7102754/jsonify-a-sqlalchemy-result-set-in-flask
+        # and here: http://stackoverflow.com/questions/5022066/how-to-serialize-sqlalchemy-result-to-json
+
+
+
+
 '''---------------------------------------------------------------------------
 NEW FRIEND
 '''
@@ -358,41 +392,6 @@ def player(player_id):
         return jsonify({"first_name": player.first_name, "last_name":player.last_name, "hcp":player.hcp, "club_id":player.club_id, "club_name":club.name, "profile_picture_id":player.profile_picture_id, "status":200})
 
 
-'''----------------------------------------------------------------------------------
-GET CLUBS
-'''
-@app.route('/getclubs', methods=['GET'])
-def getClubs():
-    result = Club.query.order_by(Club.name).all()
-    clubs=[row.serialize() for row in result]
-    return jsonify({"status":200, "clubs":clubs})
-        #return jsonify({"data":[{"hello":"bye","whatever":"cool"},{"key2":"one value"}]})
-        # explanation here: http://stackoverflow.com/questions/7102754/jsonify-a-sqlalchemy-result-set-in-flask
-        # and here: http://stackoverflow.com/questions/5022066/how-to-serialize-sqlalchemy-result-to-json
-
-
-'''------------------------------------------------------------------------------------
-GET FREINDS
-'''
-@app.route('/getfriends', methods=['GET'])
-def getFriends():
-    # player_email=request.headers.get('Player-email')
-    # result = Friend.query.filter_by(email1=player_email).all()
-    # friends=[row.serialize() for row in result]
-    # return jsonify({"status":200, "friends":friends})
-
-    a = db.aliased(Player, name='Player')
-
-    token = request.headers.get('Access-token')
-    playerList = Friend.query.join(Player, Friend.email2==Player.email).join(a, Friend.email1==a.email).add_columns(Player.first_name, Player.last_name).filter(a.access_token == token).all()
-    # playerList = Player.query.join(Friend, Player.email==Friend.email2).add_columns(Player.first_name, Player.last_name, Player.email).all()
-    # .filter(Player.email == Friend.email1).filter(Player.access_token == token).all()
-    friends=[{"first_name":row.first_name} for row in playerList]
-    return jsonify({"status":200, "friends":friends})
-
-# userList = users.query.join(friendships, users.id==friendships.user_id).add_columns(users.userId, users.name, users.email, friends.userId, friendId).filter(users.id == friendships.friend_id).filter(friendships.user_id == userID)
-    #q = db.session.query(Player).join(Player, Friends.id1==Player.id).first()
-    # result = Friends.query.join(Player, Friends.id1==Player.id).first()
 
 
 '''----------------------------------------------------------------------------------
