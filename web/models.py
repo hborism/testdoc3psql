@@ -49,7 +49,7 @@ class Player(db.Model):
     avg_score = db.Column(db.Integer)
     par_streak = db.Column(db.Integer)
     birdie_streak = db.Column(db.Integer)
-    best_club_id = db.Column(db.String(50), db.ForeignKey('club.name'))
+    best_club_name = db.Column(db.String(50), db.ForeignKey('club.name'))
     best_hole = db.Column(db.Integer)
     created = db.Column(db.DateTime, default=datetime.now)
 

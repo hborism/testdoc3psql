@@ -270,6 +270,32 @@ def getClubs():
         # and here: http://stackoverflow.com/questions/5022066/how-to-serialize-sqlalchemy-result-to-json
 
 
+'''-------------------------------------------------------------------------------
+GET My INFO and UPDATe INFO
+HEADERinput: Access-token
+JSON: all info about oneself
+'''
+@app.route("/getmyprofileinfo")
+def me():
+    token = request.headers.get('Access-token')
+    player=Player.query.filter_by(access_token=token).first()
+    if player is None:
+        return jsonify({"error": "There exist no user with that access token. please login", "message":"not found", "status":400}),400
+
+    return jsonify({"id":player.id, "first_name":player.first_name, "last_name":player.last_name, "hcp":player.hcp, "club_name":player.club_name, "email":player.email, "profile_picture_id":player.profile_picture_id, "cover_picture_id":player.cover_picture_id, "status":200}),200
+
+'''-----------------------------------------------------------------------------
+GET MY STATS
+'''
+@app.route("/getmystats")
+def mystats():
+    token = request.headers.get('Access-token')
+    player=Player.query.filter_by(access_token=token).first()
+    if player is None:
+        return jsonify({"error": "There exist no user with that access token. please login", "message":"not found", "status":400}),400
+
+    return jsonify({"status":200, "avg_score": player.avg_score, "par_streak":player.par_streak, "birdie_streak":player.birdie_streak, "best_club_name": player.best_club_name, "best_hole":player.best_hole})
+
 
 
 '''---------------------------------------------------------------------------
@@ -326,34 +352,6 @@ def scorehole():
     except exc.IntegrityError:
         return "integrity error", 502
 
-
-'''-------------------------------------------------------------------------------
-GET My INFO and UPDATe INFO
-HEADERinput: Access-token
-JSON: all info about oneself
-'''
-@app.route("/getmyprofileinfo")
-def me():
-    token = request.headers.get('Access-token')
-    player=Player.query.filter_by(access_token=token).first()
-    if player is None:
-        return jsonify({"error": "There exist no user with that access token. please login", "message":"not found", "status":400}),400
-
-    club=Club.query.filter_by(id=player.club_id).first()
-    return jsonify({"first_name":player.first_name, "last_name":player.last_name, "hcp":player.hcp, "club_id":player.club_id, "club_name":club.name, "club_id":club.id, "email":player.email, "status":200}),200
-
-'''-----------------------------------------------------------------------------
-GET MY STATS
-'''
-@app.route("/getmystats")
-def mystats():
-    token = request.headers.get('Access-token')
-    player=Player.query.filter_by(access_token=token).first()
-    if player is None:
-        return jsonify({"error": "There exist no user with that access token. please login", "message":"not found", "status":400}),400
-
-    club=Club.query.filter_by(id=player.club_id).first()
-    return jsonify({"avg_score": player.avg_score, "par_streak":player.par_streak, "birdie_streak":player.birdie_streak, "best_club": club.name, "best_club_id":club.id, "best_hole":player.best_hole})
 
 
 '''----------------------------------------------------------------------------------
