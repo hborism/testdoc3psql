@@ -184,7 +184,7 @@ def createPlayer(first_name, last_name, email, hcp, profile_picture_id, cover_pi
         db.session.commit()
         return jsonify({"message":"Player added successfully to the database","access_token":newplayer.access_token, "status":200}), 200
     except exc.IntegrityError:
-        return jsonify({"error":"serverside error", "message":"Could not add player to database", "status":500}), 500
+        return jsonify({"error":"serverside error", "message":"Could not add player to database. Does the club exist in the database?", "status":500}), 500
 
 
 '''-----------------------------------------------------------------------------
@@ -297,6 +297,26 @@ def mystats():
     return jsonify({"status":200, "avg_score": player.avg_score, "par_streak":player.par_streak, "birdie_streak":player.birdie_streak, "best_club_name": player.best_club_name, "best_hole":player.best_hole})
 
 
+
+'''-------------------------------------------------------------------------
+GET CLUBS AND COURSES
+'''
+@app.route("/getclubsandcourses")
+def getclubsandcourses():
+    clubs = Club.query.order_by(Club.name).all()
+    clubdata = []
+    for club in clubs:
+        courses= Course.query.filter_by(club_name=club.name).all()
+        coursedata=[]
+        for course in courses:
+            holes=Hole.query.filter_by(course_id=course.id).all()
+            coursedata.extend([{"id":course.id, "course_name":course.name, "holes":[hole.serialize() for hole in holes]}])
+
+        clubdata.extend([{"info":club.info, "name":club.name, "logo_id": club.logo_id, "cover_picture_id":club.cover_picture_id, "courses":coursedata}])
+
+
+
+    return jsonify({"status":200, "clubs_with_courses":clubdata})
 
 '''---------------------------------------------------------------------------
 NEW FRIEND

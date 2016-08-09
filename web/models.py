@@ -102,46 +102,47 @@ class Course(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(40))
     club_name = db.Column(db.String(50), db.ForeignKey('club.name'))
-    par1 = db.Column(db.Integer)
-    par2 = db.Column(db.Integer)
-    par3 = db.Column(db.Integer)
-    par4 = db.Column(db.Integer)
-    par5 = db.Column(db.Integer)
-    par6 = db.Column(db.Integer)
-    par7 = db.Column(db.Integer)
-    par8 = db.Column(db.Integer)
-    par9 = db.Column(db.Integer)
-    par10 = db.Column(db.Integer)
-    par11 = db.Column(db.Integer)
-    par12 = db.Column(db.Integer)
-    par13 = db.Column(db.Integer)
-    par14 = db.Column(db.Integer)
-    par15 = db.Column(db.Integer)
-    par16 = db.Column(db.Integer)
-    par17 = db.Column(db.Integer)
-    par18 = db.Column(db.Integer)
+    # par1 = db.Column(db.Integer)
+    # par2 = db.Column(db.Integer)
+    # par3 = db.Column(db.Integer)
+    # par4 = db.Column(db.Integer)
+    # par5 = db.Column(db.Integer)
+    # par6 = db.Column(db.Integer)
+    # par7 = db.Column(db.Integer)
+    # par8 = db.Column(db.Integer)
+    # par9 = db.Column(db.Integer)
+    # par10 = db.Column(db.Integer)
+    # par11 = db.Column(db.Integer)
+    # par12 = db.Column(db.Integer)
+    # par13 = db.Column(db.Integer)
+    # par14 = db.Column(db.Integer)
+    # par15 = db.Column(db.Integer)
+    # par16 = db.Column(db.Integer)
+    # par17 = db.Column(db.Integer)
+    # par18 = db.Column(db.Integer)
 
-    def __init__(self, name, club_name ,par1, par2, par3, par4, par5, par6, par7, par8, par9, par10, par11, par12, par13, par14, par15, par16, par17, par18):
+    def __init__(self, name, club_name):
+        # ,par1, par2, par3, par4, par5, par6, par7, par8, par9, par10, par11, par12, par13, par14, par15, par16, par17, par18
         self.name = name
         self.club_name = club_name
-        self.par1 = par1
-        self.par2 = par2
-        self.par3 = par3
-        self.par4 = par4
-        self.par5 = par5
-        self.par6 = par6
-        self.par7 = par7
-        self.par8 = par8
-        self.par9 = par9
-        self.par10 = par10
-        self.par11 = par11
-        self.par12 = par12
-        self.par13 = par13
-        self.par14 = par14
-        self.par15 = par15
-        self.par16 = par16
-        self.par17 = par17
-        self.par18 = par18
+        # self.par1 = par1
+        # self.par2 = par2
+        # self.par3 = par3
+        # self.par4 = par4
+        # self.par5 = par5
+        # self.par6 = par6
+        # self.par7 = par7
+        # self.par8 = par8
+        # self.par9 = par9
+        # self.par10 = par10
+        # self.par11 = par11
+        # self.par12 = par12
+        # self.par13 = par13
+        # self.par14 = par14
+        # self.par15 = par15
+        # self.par16 = par16
+        # self.par17 = par17
+        # self.par18 = par18
 
     def __repr__(self):
         return '<Course %r>' % self.name
@@ -151,15 +152,17 @@ class Course(db.Model):
 class Hole(db.Model):
     hole_no = db.Column(db.Integer, primary_key=True)
     course_id = db.Column(db.Integer, db.ForeignKey('course.id'), primary_key=True)
+    par = db.Column(db.Integer)
     index = db.Column(db.Integer)
     red_tee = db.Column(db.Integer)
     blue_tee = db.Column(db.Integer)
     yellow_tee = db.Column(db.Integer)
     white_tee = db.Column(db.Integer)
 
-    def __init__(self, hole_no, course_id, index, red_tee, blue_tee, yellow_tee, white_tee):
+    def __init__(self, hole_no, course_id, par, index, red_tee, blue_tee, yellow_tee, white_tee):
         self.hole_no = hole_no
         self.course_id = course_id
+        self.par = par
         self.index = index
         self.red_tee = red_tee
         self.blue_tee = blue_tee
@@ -170,7 +173,7 @@ class Hole(db.Model):
         return '<Hole %r>' % self.hole_no
 
     def serialize(self):
-        return {"hole_no":self.hole_no, "course_id":self.course_id, "index":self.index, "red_tee":self.red_tee, "blue_tee":self.blue_tee, "yellow_tee": self.yellow_tee, "white_tee": self.white_tee}
+        return {"hole_no":self.hole_no, "course_id":self.course_id, "par":self.par, "index":self.index, "red_tee":self.red_tee, "blue_tee":self.blue_tee, "yellow_tee": self.yellow_tee, "white_tee": self.white_tee}
 
 
 
