@@ -20,18 +20,22 @@ class Club(db.Model):
     info = db.Column(db.String(100))
     logo_id = db.Column(db.String(42), unique=True)
     cover_picture_id = db.Column(db.String(42), unique=True)
+    x_coordinates = db.Column(db.Float)
+    y_coordinates = db.Column(db.Float)
 
-    def __init__(self, name, info, logo_id, cover_picture_id):
+    def __init__(self, name, info, logo_id, cover_picture_id, x_coordinates, y_coordinates):
         self.name = name
         self.info = info
         self.logo_id = logo_id
         self.cover_picture_id = cover_picture_id
+        self.x_coordinates = x_coordinates
+        self.y_coordinates = y_coordinates
 
     def __repr__(self):
         return {"info":self.info, "name":self.name}
 
     def serialize(self):
-        return {"info":self.info, "name":self.name, "logo_id": self.logo_id, "cover_picture_id":self.cover_picture_id}
+        return {"info":self.info, "name":self.name, "logo_id": self.logo_id, "cover_picture_id":self.cover_picture_id, "x_coordinates":self.x_coordinates, "y_coordinates":self.y_coordinates}
 
 
 
@@ -39,13 +43,13 @@ class Player(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     first_name = db.Column(db.String(30))
     last_name = db.Column(db.String(40))
-    email = db.Column(db.String(50), unique=True)
+    email = db.Column(db.String(50), unique=True, nullable=False)
     hcp = db.Column(db.Integer)
     profile_picture_id = db.Column(db.String(42), unique=True)
     cover_picture_id = db.Column(db.String(42), unique=True)
     club_name = db.Column(db.String(50), db.ForeignKey('club.name'))
-    access_token = db.Column(db.String(42), unique=True)
-    password = db.Column(db.String(50))
+    access_token = db.Column(db.String(42), unique=True, nullable=False)
+    password = db.Column(db.String(50), nullable=False)
     avg_score = db.Column(db.Integer)
     par_streak = db.Column(db.Integer)
     birdie_streak = db.Column(db.Integer)
@@ -101,7 +105,7 @@ class Friendrequest(db.Model):
 class Course(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(40))
-    club_name = db.Column(db.String(50), db.ForeignKey('club.name'))
+    club_name = db.Column(db.String(50), db.ForeignKey('club.name'), nullable=False)
     # par1 = db.Column(db.Integer)
     # par2 = db.Column(db.Integer)
     # par3 = db.Column(db.Integer)
@@ -179,14 +183,15 @@ class Hole(db.Model):
 
 class Round(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    course_id = db.Column(db.Integer, db.ForeignKey('course.id'))
-    created_by_player_id= db.Column(db.Integer, db.ForeignKey('player.id'))
+    course_id = db.Column(db.Integer, db.ForeignKey('course.id'), nullable=False)
+    created_by_player_id= db.Column(db.Integer, db.ForeignKey('player.id'), nullable=False)
     timestamp = db.Column(db.DateTime, default=datetime.now)
+    type = db.Column(db.Integer, nullable=False)
 
-    def __init__(self, course_id, created_by_player_id, round_token):
+    def __init__(self, course_id, created_by_player_id, type):
         self.course_id = course_id
         self.created_by_player_id = created_by_player_id
-        self.round_token = round_token
+        self.type = type
 
     def __repr__(self):
         return '<Round %r>' % self.id
@@ -196,6 +201,7 @@ class Round(db.Model):
 class Score(db.Model):
     round_id = db.Column(db.Integer, db.ForeignKey('round.id'), primary_key=True)
     player_id = db.Column(db.Integer, db.ForeignKey('player.id'), primary_key=True)
+    marker_id = db.Column(db.Integer, db.ForeignKey('player.id'), nullable=False)
     hole1 = db.Column(db.Integer)
     hole2 = db.Column(db.Integer)
     hole3 = db.Column(db.Integer)
@@ -216,9 +222,10 @@ class Score(db.Model):
     hole18 = db.Column(db.Integer)
 
 
-    def __init__(self, round_id, player_id, hole1, hole2, hole3, hole4, hole5, hole6, hole7, hole8, hole9, hole10, hole11, hole12, hole13, hole14, hole15, hole16, hole17, hole18):
+    def __init__(self, round_id, player_id, marker_id, hole1, hole2, hole3, hole4, hole5, hole6, hole7, hole8, hole9, hole10, hole11, hole12, hole13, hole14, hole15, hole16, hole17, hole18):
         self.round_id = round_id
         self.player_id = player_id
+        self.marker_id = marker_id
         self.hole1 = hole1
         self.hole2 = hole2
         self.hole3 = hole3
@@ -241,15 +248,16 @@ class Score(db.Model):
 
 
 class Roundinprogress(db.Model):
-    token = db.Column(db.String(42), primary_key=True)
-    course_id = db.Column(db.Integer, db.ForeignKey('course.id'))
+    id = db.Column(db.Integer, primary_key=True)
+    course_id = db.Column(db.Integer, db.ForeignKey('course.id'), nullable=False)
     timestamp = db.Column(db.DateTime, default=datetime.now)
-    created_by_player_id = db.Column(db.Integer, db.ForeignKey('player.id'))
+    created_by_player_id = db.Column(db.Integer, db.ForeignKey('player.id'), nullable=False)
+    type = db.Column(db.Integer)
 
-    def __init__(self, course_id, token, created_by_player_id):
+    def __init__(self, course_id, created_by_player_id, type):
         self.course_id = course_id
         self.created_by_player_id = created_by_player_id
-        self.token = token
+        self.type = type
 
     def __repr__(self):
         return '<Round %r>' % self.id
@@ -257,20 +265,28 @@ class Roundinprogress(db.Model):
 
 
 class Scorerequest(db.Model):
-    roundinprocess_token = db.Column(db.String(42), db.ForeignKey('roundinprogress.token'), primary_key=True)
-    inviter_id = db.Column(db.Integer, db.ForeignKey('player.id'))
+    roundinprocess_id = db.Column(db.Integer, db.ForeignKey('roundinprogress.id'), primary_key=True)
+    inviter_id = db.Column(db.Integer, db.ForeignKey('player.id'), nullable=False)
     invited_id = db.Column(db.Integer, db.ForeignKey('player.id'), primary_key=True)
 
 
-    def __init__(self, roundinprocess_token, inviter_id, invited_id):
-        self.roundinprocess_token = roundinprocess_token
+    def __init__(self, roundinprocess_id, inviter_id, invited_id):
+        self.roundinprocess_id = roundinprocess_id
         self.inviter_id = inviter_id
         self.invited_id = invited_id
 
+    def serialize(self):
+        return {"roundinprogress_id":self.roundinprocess_id, "inviter_id":self.inviter_id}
+
+
 
 class Scoreinprogress(db.Model):
-    roundinprogress_token = db.Column(db.String(42), db.ForeignKey('roundinprogress.token'), primary_key=True)
+    roundinprogress_id = db.Column(db.Integer, db.ForeignKey('roundinprogress.id'), primary_key=True)
     player_id = db.Column(db.Integer, db.ForeignKey('player.id'), primary_key=True)
+    marker_id = db.Column(db.Integer, db.ForeignKey('player.id'), nullable=False)
+    player_signature = db.Column(db.Boolean, default=False)
+    marker_signature = db.Column(db.Boolean, default=False)
+    score_token = db.Column(db.String(42), unique=True, nullable=False)
     hole1 = db.Column(db.Integer)
     hole2 = db.Column(db.Integer)
     hole3 = db.Column(db.Integer)
@@ -290,6 +306,8 @@ class Scoreinprogress(db.Model):
     hole17 = db.Column(db.Integer)
     hole18 = db.Column(db.Integer)
 
-    def __init__(self, round_id, player_di):
-        self.round_id = round_id
+    def __init__(self, roundinprogress_id, player_id, marker_id, score_token):
+        self.roundinprogress_id = roundinprogress_id
         self.player_id = player_id
+        self.marker_id = marker_id
+        self.score_token = score_token

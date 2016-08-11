@@ -53,7 +53,7 @@ ERRORS
 
 @app.errorhandler(404)
 def page_not_found(e):
-    return jsonify({"error":'unknown 404-error', "message":"unknown reason. Please check backend", "status":404}), 404
+    return jsonify({"error":'unknown 404-error', "message":"Please check URL", "status":404}), 404
 
 @app.errorhandler(501)
 def page_not_found(e):
@@ -275,7 +275,7 @@ GET My INFO and UPDATe INFO
 HEADERinput: Access-token
 JSON: all info about oneself
 '''
-@app.route("/getmyprofileinfo")
+@app.route("/getmyprofileinfo", methods=['GET'])
 def me():
     token = request.headers.get('Access-token')
     player=Player.query.filter_by(access_token=token).first()
@@ -287,7 +287,7 @@ def me():
 '''-----------------------------------------------------------------------------
 GET MY STATS
 '''
-@app.route("/getmystats")
+@app.route("/getmystats", methods=['GET'])
 def mystats():
     token = request.headers.get('Access-token')
     player=Player.query.filter_by(access_token=token).first()
@@ -301,7 +301,7 @@ def mystats():
 '''-------------------------------------------------------------------------
 GET CLUBS AND COURSES
 '''
-@app.route("/getclubsandcourses")
+@app.route("/getclubsandcourses", methods=['GET'])
 def getclubsandcourses():
     clubs = Club.query.order_by(Club.name).all()
     clubdata = []
@@ -318,9 +318,91 @@ def getclubsandcourses():
 
     return jsonify({"status":200, "clubs_with_courses":clubdata})
 
-'''---------------------------------------------------------------------------
-NEW FRIEND
+
+'''--------------------------------------------------------------------------
+START NEW ROUND
 '''
+@app.route("/startnewround", methods=['POST'])
+def startnewround():
+    token = request.headers.get('Access-token')
+    player=Player.query.filter_by(access_token=token).first()
+    if player is None:
+        return jsonify({"error": "There exist no user with that access token. please login", "message":"not found", "status":400}),400
+
+    course_id = request.json['course_id']
+    type = request.json['type']
+
+    if type == 1:
+        newroundinprogress = Roundinprogress(course_id, player.id, type)
+        db.session.add(newroundinprogress)
+        db.session.commit()
+
+        score_token = str(uuid.uuid4())
+        while Scoreinprogress.query.filter_by(score_token=score_token).first() is not None:
+            score_token = str(uuid.uuid4())
+
+        newscoreinprogress = Scoreinprogress(newroundinprogress.id, player.id, player.id, score_token)
+
+
+        db.session.add(newscoreinprogress)
+        db.session.commit()
+        return jsonify({"message":"New round added to database","roundinprogress_id":newroundinprogress.id, "scoreinprogresses":[{"player_id":newscoreinprogress.player_id, "marker_id":newscoreinprogress.marker_id, "score_token":newscoreinprogress.score_token}], "status":200}), 200
+
+    return jsonify({"error": "Type shall be 1", "message":"Currently backend only supports type=1", "status":401}),401
+
+
+
+'''---------------------------------------------------------------------------
+NEW SCORE REQUEST and GET SCORE REQUEST
+'''
+@app.route("/newscorerequest", methods=['POST', 'GET'])
+def newscorerequest():
+    token = request.headers.get('Access-token')
+    player=Player.query.filter_by(access_token=token).first()
+    if player is None:
+        return jsonify({"error": "There exist no user with that access token. please login", "message":"not found", "status":400}),400
+
+    if request.method == 'POST':
+
+        roundinprogress_id = request.json['roundinprogress_id']
+        invited_id = request.json['invited_id']
+
+        newscorerequest = Scorerequest(roundinprogress_id, player.id, invited_id)
+        db.session.add(newscorerequest)
+        db.session.commit()
+        return jsonify({"message":"Score request added to database", "status":200}),200
+
+    # if request.method=='GET':
+    result=Scorerequest.query.filter_by(invited_id=player.id).all()
+    scorerequests=[row.serialize() for row in result]
+    return jsonify({"status":200, "scorerequests":scorerequests})
+
+'''---------------------------------------------------------------------------
+UPDATe SCOREHOLE
+'''
+@app.route("/updatescorehole", methods=['POST'])
+def updatescorehole():
+    roundinprogress_id = request.json['roundinprogress_id']
+    player_id = request.json['player_id']
+    hole = request.json['hole']
+    score = request.json['score']
+    score_token = request.json['score_token']
+    if hole <=0 or hole >=19:
+        return jsonify({"error": "hole must be an int and in range 1-18", "message":"fix it", "status":401}),401
+
+    scoretoupdate = Scoreinprogress.query.filter_by(roundinprogress_id=roundinprogress_id).filter_by(player_id=player_id).first()
+    if scoretoupdate is None:
+        return jsonify({"error": "There exist no scoreinprogress with that player_id and roundinprogress_id", "message":"fix it", "status":400}),400
+
+    if scoretoupdate.score_token != score_token:
+        return jsonify({"error": "Please enter the correct score_token", "message":"fix it", "status":402}),402
+
+    command="scoretoupdate.hole"+str(hole)+"=score"
+    exec(command)
+    db.session.commit()
+
+    return jsonify({"status":200, "message":"score updated!"})
+
 
 
 '''----------------------------------------------------------------------------
