@@ -346,7 +346,7 @@ def startnewround():
 
         db.session.add(newscoreinprogress)
         db.session.commit()
-        return jsonify({"message":"New round added to database","roundinprogress_id":newroundinprogress.id, "scoreinprogresses":[{"player_id":newscoreinprogress.player_id, "marker_id":newscoreinprogress.marker_id, "score_token":newscoreinprogress.score_token}], "status":200}), 200
+        return jsonify({"message":"New round added to database","roundinprogress_id":newroundinprogress.id, "player_id":newscoreinprogress.player_id, "marker_id":newscoreinprogress.marker_id, "status":200}), 200
 
     return jsonify({"error": "Type shall be 1", "message":"Currently backend only supports type=1", "status":401}),401
 
@@ -365,6 +365,13 @@ def newscorerequest():
     if request.method == 'POST':
 
         roundinprogress_id = request.json['roundinprogress_id']
+        round = Roundinprogress.query.filter_by(id=roundinprogress_id).first()
+        if round is None:
+            return jsonify({"error": "Access token does not match that of a round", "message":"null round", "status":401}),401
+
+        if round.created_by_player_id != player.id:
+            return jsonify({"error": "Access token does not match that of the creator of the round", "message":"denied access", "status":402}),402
+
         invited_id = request.json['invited_id']
 
         newscorerequest = Scorerequest(roundinprogress_id, player.id, invited_id)
@@ -377,31 +384,180 @@ def newscorerequest():
     scorerequests=[row.serialize() for row in result]
     return jsonify({"status":200, "scorerequests":scorerequests})
 
+'''--------------------------------------------------------------------------
+SCORE REQUEST RESPONSE
+'''
+@app.route("/scorerequestresponse", methods=['POST'])
+def scorerequestresponse():
+    token = request.headers.get('Access-token')
+    player=Player.query.filter_by(access_token=token).first()
+    if player is None:
+        return jsonify({"error": "There exist no user with that access token. please login", "message":"not found", "status":400}),400
+
+    roundinprogress_id = request.json['roundinprogress_id']
+    scorerequest = Scorerequest.query.filter_by(roundinprogress_id=roundinprogress_id).filter_by(invited_id=player.id).first()
+    if scorerequest is None:
+        return jsonify({"error": "Access token does not match that of a request", "message":"null request", "status":401}),401
+
+    if scorerequest.invited_id != player.id:
+        return jsonify({"error": "Access token does not match that of the invited", "message":"denied access", "status":402}),402
+
+    accept = request.json['accept']
+    db.session.delete(scorerequest)
+
+    if accept == False or accept is None:
+        db.session.commit()
+        return jsonify({"message":"scorerequest removed", "status":200}),200
+
+    # if accept == true
+    score_token = str(uuid.uuid4())
+    while Scoreinprogress.query.filter_by(score_token=score_token).first() is not None:
+        score_token = str(uuid.uuid4())
+
+    newscoreinprogress = Scoreinprogress(scorerequest.roundinprogress_id, player.id, scorerequest.inviter_id, score_token)
+    db.session.add(newscoreinprogress)
+    db.session.commit()
+    return jsonify({"message":"New score added to round","roundinprogress_id":scorerequest.roundinprogress_id, "player_id":newscoreinprogress.player_id, "marker_id":newscoreinprogress.marker_id, "status":200}), 200
+
+
+
 '''---------------------------------------------------------------------------
 UPDATe SCOREHOLE
 '''
 @app.route("/updatescorehole", methods=['POST'])
 def updatescorehole():
+    token = request.headers.get('Access-token')
+    requestsender = Player.query.filter_by(access_token = token).first()
     roundinprogress_id = request.json['roundinprogress_id']
     player_id = request.json['player_id']
     hole = request.json['hole']
     score = request.json['score']
-    score_token = request.json['score_token']
     if hole <=0 or hole >=19:
         return jsonify({"error": "hole must be an int and in range 1-18", "message":"fix it", "status":401}),401
 
     scoretoupdate = Scoreinprogress.query.filter_by(roundinprogress_id=roundinprogress_id).filter_by(player_id=player_id).first()
     if scoretoupdate is None:
-        return jsonify({"error": "There exist no scoreinprogress with that player_id and roundinprogress_id", "message":"fix it", "status":400}),400
+        return jsonify({"error": "There exist no scoreinprogress with that player_id and roundinprogress_id", "message":"invite a player or create a round", "status":400}),400
 
-    if scoretoupdate.score_token != score_token:
-        return jsonify({"error": "Please enter the correct score_token", "message":"fix it", "status":402}),402
+    if requestsender.id != scoretoupdate.player_id and requestsender.id != scoretoupdate.marker_id:
+        return jsonify({"error": "You must be the marker or the player to be able to update the ", "message":"please log in as player or marker", "status":402}),402
+
+    if scoretoupdate.player_signature==True or scoretoupdate.marker_signature==True:
+        return jsonify({"error": "Scorecard already signed by player or marker or both", "message":"Please unsign before enter score", "status":403}),403
 
     command="scoretoupdate.hole"+str(hole)+"=score"
     exec(command)
     db.session.commit()
 
-    return jsonify({"status":200, "message":"score updated!"})
+    return jsonify({"status":200, "message":"score updated"})
+
+
+'''--------------------------------------------------------------------------
+GET ROUND WITH SCORE
+'''
+@app.route("/getroundwithscores", methods=['GET'])
+def getroundwithscores():
+    token = request.headers.get('Access-token')
+    player=Player.query.filter_by(access_token=token).first()
+    if player is None:
+        return jsonify({"error": "There exist no player with that access token. please login", "message":"not found", "status":400}),400
+
+    roundinprogress_id=request.headers.get('Roundinprogress-id')
+
+    roundinprogress = Roundinprogress.query.filter_by(id=roundinprogress_id).first()
+    if roundinprogress is None:
+        return jsonify({"error": "There exist no roundinprogress with that id", "message":"not found", "status":401}),401
+
+    course = Course.query.filter_by(id = roundinprogress.course_id).first()
+    result = Scoreinprogress.query.filter_by(roundinprogress_id = roundinprogress_id).all()
+    scores=[row.serialize() for row in result]
+    return jsonify({"status":200, "scores":scores, "roundinprogress_id": roundinprogress.id, "course_name": course.name, "club_name": course.club_name, "course_id": roundinprogress.course_id, "timestamp": roundinprogress.timestamp, "created_by_player_id": roundinprogress.created_by_player_id, "type": roundinprogress.type})
+
+'''---------------------------------------------------------------------------
+SIGN AS PLAYER
+'''
+@app.route("/signasplayer", methods=['POST'])
+def signasplayer():
+    token = request.headers.get('Access-token')
+    player=Player.query.filter_by(access_token=token).first()
+    if player is None:
+        return jsonify({"error": "There exist no player with that access token. please login", "message":"not found", "status":400}),400
+
+    roundinprogress_id=request.json["roundinprogress_id"]
+
+    score= Scoreinprogress.query.filter_by(roundinprogress_id = roundinprogress_id).filter_by(player_id=player.id).first()
+    if score is None:
+        return jsonify({"error": "The roundinprogress_id and player_id does not match any scoreinprogress", "message":"not found", "status":401}),401
+
+    signature = request.json['signature']
+    if signature is None:
+        signature = False
+
+    score.player_signature=signature
+    db.session.commit()
+    if signature==False:
+        return jsonify({"message": "Score unsigned", "status":200}),400
+
+    return checkifroundisfinished(roundinprogress_id)
+    # return jsonify({"status":200, "message":"score signed as player"})
+
+'''--------------------------------------------------------------------------
+SIGN AS MARKER
+'''
+@app.route("/signasmarker", methods=['POST'])
+def signasmarker():
+    token = request.headers.get('Access-token')
+    player=Player.query.filter_by(access_token=token).first()
+    if player is None:
+        return jsonify({"error": "There exist no user with that access token. please login", "message":"not found", "status":400}),400
+
+    roundinprogress_id=request.json["roundinprogress_id"]
+    player_id = request.json["player_id"]
+    score= Scoreinprogress.query.filter_by(roundinprogress_id = roundinprogress_id).filter_by(player_id=player_id).first()
+    if score is None:
+        return jsonify({"error": "The roundinprogress_id and player_id does not match any scoreinprogress", "message":"not found", "status":401}),401
+
+    if score.marker_id != player.id:
+        return jsonify({"error": "The access-token does not belong to the marker of this score", "message":"invalid identification", "status":403}),403
+
+    signature = request.json['signature']
+    if signature is None:
+        signature = False
+
+    score.marker_signature=signature
+    db.session.commit()
+    if signature==False:
+        return jsonify({"message": "Score unsigned", "status":200}),400
+
+    return checkifroundisfinished(roundinprogress_id)
+    # return jsonify({"status":200, "message":"score signed as marker"})
+
+
+'''---------------------------------
+CHECK IF ROUNDINPROGRESS IS SIGNED BY ALL
+
+make sure to do this as one transaction so that not two people sign at the
+same time and (finishing the round) and this function does not transfer
+roundinprogress to round. Small risk that it would happen but if would be very annoying when it does
+'''
+def checkifroundisfinished(roundinprogress_id):
+    scores = Scoreinprogress.query.filter_by(roundinprogress_id=roundinprogress_id).all()
+
+    for score in scores:
+        if score.player_signature==False or score.marker_signature==False:
+            return jsonify({"status":201, "message":"score signed. Waiting for other to sign "})
+
+
+    # archiveround(roundinprogress_id)
+    return jsonify({"status":210, "message":"score signed. Everyone has signed. All ok "}), 210
+
+
+'''-----------------------------
+Archive round
+'''
+def archiveround(roundinprogress_id):
+    return None
+
 
 
 

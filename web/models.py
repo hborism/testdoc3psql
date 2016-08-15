@@ -265,18 +265,18 @@ class Roundinprogress(db.Model):
 
 
 class Scorerequest(db.Model):
-    roundinprocess_id = db.Column(db.Integer, db.ForeignKey('roundinprogress.id'), primary_key=True)
+    roundinprogress_id = db.Column(db.Integer, db.ForeignKey('roundinprogress.id'), primary_key=True)
     inviter_id = db.Column(db.Integer, db.ForeignKey('player.id'), nullable=False)
     invited_id = db.Column(db.Integer, db.ForeignKey('player.id'), primary_key=True)
 
 
-    def __init__(self, roundinprocess_id, inviter_id, invited_id):
-        self.roundinprocess_id = roundinprocess_id
+    def __init__(self, roundinprogress_id, inviter_id, invited_id):
+        self.roundinprogress_id = roundinprogress_id
         self.inviter_id = inviter_id
         self.invited_id = invited_id
 
     def serialize(self):
-        return {"roundinprogress_id":self.roundinprocess_id, "inviter_id":self.inviter_id}
+        return {"roundinprogress_id":self.roundinprogress_id, "inviter_id":self.inviter_id}
 
 
 
@@ -311,3 +311,10 @@ class Scoreinprogress(db.Model):
         self.player_id = player_id
         self.marker_id = marker_id
         self.score_token = score_token
+
+    def serialize(self):
+        return {"player_id": self.player_id, "marker_id":self.marker_id, "player_signature":self.player_signature, \
+        "marker_signature": self.marker_signature, "hole1":self.hole1, "hole2":self.hole2, "hole3":self.hole3, \
+        "hole4":self.hole4, "hole5":self.hole5, "hole6":self.hole6, "hole7":self.hole7, "hole8": self.hole8, \
+        "hole9":self.hole9, "hole10":self.hole10, "hole11":self.hole11, "hole12":self.hole12, "hole13":self.hole13, \
+        "hole14":self.hole14, "hole15":self.hole15, "hole16":self.hole16, "hole17":self.hole17, "hole18":self.hole18}
