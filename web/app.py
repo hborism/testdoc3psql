@@ -548,14 +548,36 @@ def checkifroundisfinished(roundinprogress_id):
             return jsonify({"status":201, "message":"score signed. Waiting for other to sign "})
 
 
-    # archiveround(roundinprogress_id)
+    archiveround(scores, roundinprogress_id)
     return jsonify({"status":210, "message":"score signed. Everyone has signed. All ok "}), 210
 
 
 '''-----------------------------
 Archive round
 '''
-def archiveround(roundinprogress_id):
+def archiveround(scores, roundinprogress_id):
+
+    roundinprogress = Roundinprogress.query.filter_by(id=roundinprogress_id).first()
+
+    round = Round(roundinprogress.course_id, roundinprogress.created_by_player_id, roundinprogress.type)
+    db.session.add(round)
+    db.session.commit()
+
+    for s in scores:
+        archivescore = Score(round.id, s.player_id, s.marker_id, s.hole1, s.hole2, s.hole3, s.hole4, s.hole5, s.hole6, s.hole7, \
+        s.hole8, s.hole9, s.hole10, s.hole11, s.hole12, s.hole13, s.hole14, s.hole15, s.hole16, s.hole17, s.hole18)
+        db.session.add(archivescore)
+        db.session.delete(s)
+
+    # check that there are no dependencies in scorerequest. If there are, then delete
+    requests = Scorerequest.query.filter_by(roundinprogress_id = roundinprogress_id)
+    for r in requests:
+        db.session.delete(r)
+
+    db.session.commit()
+
+    db.session.delete(roundinprogress)
+    db.session.commit()
     return None
 
 
