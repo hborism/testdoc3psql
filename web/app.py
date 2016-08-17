@@ -30,6 +30,7 @@ app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://postgres:postgres@postgres
 #app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://{db_user}:{db_password}@{db_service}:{db_port}/{db_name}
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS']=False
 app.config['UPLOAD_FOLDER'] = '/usr/src/app/profilepictures'
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
 
 
 db = SQLAlchemy(app)
@@ -47,33 +48,54 @@ from models import *
 --------------------------------------------
 '''
 
+'''--------------------------------------------------------------------------
+ROOT
+'''
+@app.route('/', methods=['GET'])
+def index():
+    user= request.args.get('user')
+    token = request.headers.get('Access-token')
+    other = request.headers.get('otherkey')
+    return jsonify({"info":info, "access token":token, "other key":other, "user":user})
+
+
+
 '''---------------------------------------------------------------------------
 ERRORS
 '''
-
 @app.errorhandler(404)
 def page_not_found(e):
     return jsonify({"error":'unknown 404-error', "message":"Please check URL", "status":404}), 404
 
 @app.errorhandler(501)
 def page_not_found(e):
-    return jsonify({"error":'unknown 501-error', "message":"unknown reason. Please check backend", "status":510}), 510
+    return jsonify({"error":'unknown 501-error', "message":"unknown reason. Please check backend", "status":511}), 511
 
 @app.errorhandler(502)
 def page_not_found(e):
-    return jsonify({"error":'unknown 502-error', "message":"unknown reason. Please check backend", "status":510}), 510
+    return jsonify({"error":'unknown 502-error', "message":"unknown reason. Please check backend", "status":512}), 512
 
 @app.errorhandler(503)
 def page_not_found(e):
-    return jsonify({"error":'unknown 503-error', "message":"unknown reason. Please check backend", "status":510}), 510
+    return jsonify({"error":'unknown 503-error', "message":"unknown reason. Please check backend", "status":513}), 513
 
 @app.errorhandler(504)
 def page_not_found(e):
-    return jsonify({"error":'unknown 504-error', "message":"unknown reason. Please check backend", "status":510}), 510
+    return jsonify({"error":'unknown 504-error', "message":"unknown reason. Please check backend", "status":514}), 514
 
 @app.errorhandler(500)
 def page_not_found(e):
     return jsonify({"error":'unknown 500-error', "message":"unknown reason. Please check backend", "status":510}), 510
+
+
+'''---------------------------------------------------------------------------
+UPLOAD PROFILE PICTURE
+'''
+@app.route('/uploadprofilepicture', methods=['POST'])
+def uploadprofilepicture():
+    token = request.headers.get('Access-token')
+    return (token)
+
 
 '''-----------------------------------------------------------------------------
 UPLOAD PICTURE
@@ -579,138 +601,6 @@ def archiveround(scores, roundinprogress_id):
     db.session.delete(roundinprogress)
     db.session.commit()
     return None
-
-
-
-
-'''----------------------------------------------------------------------------
-NEW ROUND
-JSONinput: course_id, player_id
-JSONoutput: ---
-'''
-@app.route('/newround', methods=['POST'])
-def newround():
-    newround=Round(request.json['course_id'], request.json['player_id'])
-    try:
-        db.session.add(newround)
-        db.session.commit()
-        return "Round started and added to database", 200
-    except exc.IntegrityError:
-        return "integrity error", 502
-
-
-
-'''
-NEW SCORE
-JSONinput: round_id, player_id
-JSONoutput: ---
-'''
-@app.route('/newscore', methods=['POST'])
-def newscore():
-    newscore=Score(request.json['round_id'], request.json['player_id'])
-    try:
-        db.session.add(newscore)
-        db.session.commit()
-        return "Score added", 200
-    except exc.IntegrityError:
-        return "integrity error", 502
-
-
-
-'''-------------------------------------------------------------------------------
-NEW SCOREHOLE
-JSONinput: round_id, player_id, hole_id, shots
-JSONoutput: ---------
-'''
-@app.route('/scorehole', methods=['POST'])
-def scorehole():
-    scorehole=ScoreHole(request.json['round_id'], request.json['player_id'], request.json['hole_no'], request.json['shots'])
-    try:
-        db.session.add(scorehole)
-        db.session.commit()
-        return "scorehole added", 200
-    except exc.IntegrityError:
-        return "integrity error", 502
-
-
-
-'''----------------------------------------------------------------------------------
-CHANGE HCP
-'''
-@app.route("/me/hcp", methods=['POST'])
-def changeHCP():
-    token = request.headers.get('Access-token')
-    player=Player.query.filter_by(access_token=token).first()
-
-    if player is None:
-        return jsonify({"error": "There exist no user with that access token. please login", "message":"not found", "status":400}),400
-
-    player.hcp = request.json["hcp"]
-    db.session.commit()
-    return jsonify({"message":"Success!", "new_hcp":player.hcp, "status":200}),200
-
-
-'''--------------------------------------------------------------------------------
-GET player info
-'''
-@app.route("/player/<int:player_id>")
-def player(player_id):
-    token=request.headers.get('Access-token')
-    client_player=Player.query.filter_by(access_token=token).first()
-    if client_player is None:
-        return jsonify({"error": "There exist no user with that access token. please login", "type":"not found", "status":400}),400
-
-    friend = Friends.query.filter_by(id1=client_player.id,id2=player_id).first()
-
-    if friend is None:
-        return jsonify({"error":"Since you are not friend with player of that id you are now allowed to see the players info", "type":"not friend", "status":400}),400
-    else:
-        player=Player.query.filter_by(id=player_id).first()
-        club=Club.query.filter_by(id=player.club_id).first()
-        return jsonify({"first_name": player.first_name, "last_name":player.last_name, "hcp":player.hcp, "club_id":player.club_id, "club_name":club.name, "profile_picture_id":player.profile_picture_id, "status":200})
-
-
-
-
-'''----------------------------------------------------------------------------------
-CHECK IF friends
-
-def getFriends(player_id):
-    friends = Friends.query.filter_by(id1=player_id).all()
-    return jsonify({"friends": friends})
-'''
-
-
-#-----------------------------OLD stuff: replace with functions using psql database----------------------------
-
-@app.route('/', methods=['GET'])
-def index():
-    user= request.args.get('user')
-    token = request.headers.get('Access-token')
-    other = request.headers.get('otherkey')
-    return jsonify({"info":info, "access token":token, "other key":other, "user":user})
-
-
-
-@app.route("/scorecard/<int:scoreCardId>", methods=['GET'])
-def scoreCard(scoreCardId):
-	if scoreCardId==1:
-		return jsonify({"scoreCard":card})
-	else:
-		return jsonify({"error": {"message":"There exist no round with that id", "type":"not found"}})
-
-
-@app.route("/scorecard/<int:scoreCardId>", methods=['POST'])
-def addScore(scoreCardId):
-	if scoreCardId==1:
-		hole=request.json["hole"]
-		score=request.json["score"]
-		if hole>3 or hole<1:
-			return jsonify({"error": {"message":"There exist no hole with that id", "type":"not found"}})
-		card["score"][hole]=score
-		return jsonify({"hole":hole, "score":score})
-	else:
-		return jsonify({"error": {"message":"There exist no round with that id", "type":"not found"}})
 
 
 if __name__ == '__main__':
