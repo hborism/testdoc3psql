@@ -94,6 +94,19 @@ UPLOAD PROFILE PICTURE
 @app.route('/uploadprofilepicture', methods=['POST'])
 def uploadprofilepicture():
     token = request.headers.get('Access-token')
+    if 'file' not in request.files:
+        return jsonify({"error": "no file in request.files", "token":token}),555
+
+    file = request.files['file']
+    # if user does not select file, browser also
+    # submit a empty part without filename
+    if file.filename == '':
+        return jsonify({"error": "filename blank" ,"token":token}),556
+    if file and allowed_file(file.filename):
+        filename = secure_filename(file.filename)
+        file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+        return redirect(url_for('uploaded_file',
+                                filename=filename))
     return (token)
 
 
@@ -112,11 +125,11 @@ def upload_file():
         # submit a empty part without filename
         if file.filename == '':
             return 'No selected file'
-        if file and allowed_file(file.filename):
-            filename = secure_filename(file.filename)
-            file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+
+        filename = file.filename
+        file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
             # return redirect(url_for('upload_file', filename=filename))
-            return "uploaded :)"
+        return "uploaded :)"
     return '''
     <!doctype html>
     <title>Upload new File</title>
@@ -274,7 +287,16 @@ def getFriends():
         if player is None:
             return jsonify({"status":400, "error":"No player with that accesstoken", "message":"Please enter a valid access-token"}),400
 
-    friends=[{"id":row.id, "first_name":row.first_name, "last_name":row.last_name, "hcp":row.hcp, "club_name":row.club_name, "profile_picture_id":row.profile_picture_id, "cover_picture_id":row.cover_picture_id} for row in playerList]
+    friends =[]
+    for row in playerList:
+        profile_picture_id = row.profile_picture_id
+        base64 = None
+        if profile_picture_id is not None:
+            f = open('profilepictures/'+profile_picture_id+'_ICON', 'r')
+            base64 = f.read()
+
+        friends.extend([{"profile_picture_icon":base64, "id":row.id, "first_name":row.first_name, "last_name":row.last_name, "hcp":row.hcp, "club_name":row.club_name, "profile_picture_id":row.profile_picture_id, "cover_picture_id":row.cover_picture_id}])
+
     return jsonify({"status":200, "friends":friends})
 
 
