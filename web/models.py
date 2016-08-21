@@ -14,12 +14,19 @@ import json
 ---------------------------------------------------------------------
 '''
 
+class Image(db.Model):
+    id = db.Column(db.String(42), primary_key=True)
+    timestamp = db.Column(db.DateTime, default=datetime.now)
+
+    def __init__(self, id):
+        self.id = id
+
 
 class Club(db.Model):
     name = db.Column(db.String(50) ,primary_key=True)
     info = db.Column(db.String(100))
-    logo_id = db.Column(db.String(42), unique=True)
-    cover_picture_id = db.Column(db.String(42), unique=True)
+    logo_id = db.Column(db.String(42), db.ForeignKey('image.id'), unique=True)
+    cover_picture_id = db.Column(db.String(42), db.ForeignKey('image.id'), unique=True)
     x_coordinates = db.Column(db.Float)
     y_coordinates = db.Column(db.Float)
 
@@ -45,8 +52,8 @@ class Player(db.Model):
     last_name = db.Column(db.String(40))
     email = db.Column(db.String(50), unique=True, nullable=False)
     hcp = db.Column(db.Integer)
-    profile_picture_id = db.Column(db.String(42), unique=True)
-    cover_picture_id = db.Column(db.String(42), unique=True)
+    profile_picture_id = db.Column(db.String(42), db.ForeignKey('image.id'), unique=True)
+    cover_picture_id = db.Column(db.String(42), db.ForeignKey('image.id'), unique=True)
     club_name = db.Column(db.String(50), db.ForeignKey('club.name'))
     access_token = db.Column(db.String(42), unique=True, nullable=False)
     password = db.Column(db.String(50), nullable=False)

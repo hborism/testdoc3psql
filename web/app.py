@@ -3,9 +3,10 @@ from sqlalchemy import *
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
-
+from sqlalchemy import text
 
 import os
+import sys
 import uuid
 import datetime
 import urllib.request
@@ -17,10 +18,10 @@ from datetime import datetime
 from sqlalchemy import exc
 from werkzeug.utils import secure_filename
 
-info= {"status":200, "header":"Social golf app by Axel and Boris" ,"body": "An app developed for further enhancing the experience of the wonderful game of golf"}
-henrik={"id":1, "firstName": "Henrik", "lastName": "Boris-Möller", "hcp": 8.8, "club": "Wasa GK"}
-axel = {"id":2, "firstName": "Axel", "lastName": "Sundberg", "hcp": 4.8, "club": "Båstad GK"}
-card= {"id":1, "course":"LAGK", "timestamp": "14.30 2016-06-12", "score": {1:None, 2:None, 3:None}, "ForImprovementInfo":"Instead of score:(...) we will in the future have (player1:((playerId:1... (score: () etc"}
+import PIL.Image
+import base64
+
+
 
 UPLOAD_FOLDER = '/usr/src/app/profilepictures'
 ALLOWED_EXTENSIONS = set(['png', 'jpg', 'jpeg', 'gif'])
@@ -91,45 +92,38 @@ def page_not_found(e):
 '''---------------------------------------------------------------------------
 UPLOAD PROFILE PICTURE
 '''
-@app.route('/uploadprofilepicture', methods=['POST'])
+@app.route('/uploadprofilepicture', methods=['GET','POST'])
 def uploadprofilepicture():
-    token = request.headers.get('Access-token')
-    if 'file' not in request.files:
-        return jsonify({"error": "no file in request.files", "token":token}),555
-
-    file = request.files['file']
-    # if user does not select file, browser also
-    # submit a empty part without filename
-    if file.filename == '':
-        return jsonify({"error": "filename blank" ,"token":token}),556
-    if file and allowed_file(file.filename):
-        filename = secure_filename(file.filename)
-        file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
-        return redirect(url_for('uploaded_file',
-                                filename=filename))
-    return (token)
-
-
-'''-----------------------------------------------------------------------------
-UPLOAD PICTURE
-work in progress. currently only possible to upload via the html page
-'''
-@app.route('/uploadpic', methods=['GET', 'POST'])
-def upload_file():
     if request.method == 'POST':
-        # check if the post request has the file part
-        if 'file' not in request.files:
-            return 'No file part'
-        file = request.files['file']
-        # if user does not select file, browser also
-        # submit a empty part without filename
-        if file.filename == '':
-            return 'No selected file'
+        token = request.headers.get('Access-token')
+        player=Player.query.filter_by(access_token=token).first()
+        if player is None:
+            return jsonify({"error": "There exist no user with that access token. please login", "message":"not found", "status":400}),400
 
-        filename = file.filename
-        file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
-            # return redirect(url_for('upload_file', filename=filename))
-        return "uploaded :)"
+        if 'avatar' not in request.files:
+            return jsonify({"error": "There is no avatar", "message":"not found", "status":401}),401
+
+        file = request.files['avatar']
+
+        # Generate id for image
+        picture_id = str(uuid.uuid4())
+        while Image.query.filter_by(id=picture_id).first() is not None:
+            picture_id = str(uuid.uuid4())
+
+        # Save image
+        profile_picture = Image(picture_id)
+        db.session.add(profile_picture)
+        db.session.commit()
+
+        player.profile_picture_id=picture_id
+        db.session.commit()
+
+        #file.save(picture_id)
+        file.save(os.path.join(app.config['UPLOAD_FOLDER'], picture_id))
+
+        createIcon(picture_id, picture_id, 150)
+
+        return jsonify({"picture_id":picture_id, "message":"File uploaded", "status":200}),200
     return '''
     <!doctype html>
     <title>Upload new File</title>
@@ -140,19 +134,24 @@ def upload_file():
     </form>
     '''
 
-# @app.route('/upload', methods=['GET', 'POST'])
-# def upload():
-#     # if request.method == 'POST':
-#         # file = request.files['file']
-#         # extension = os.path.splitext(file.filename)[1]
-#         # f_name = str(uuid.uuid4()) + extension
-#         # file.save(os.path.join(app.config['UPLOAD_FOLDER'], f_name))
-#         # return json.dumps({'filename':f_name})
-#     return "use POST request"
-#
-# def allowed_file(filename):
-#     return '.' in filename and \
-#            filename.rsplit('.', 1)[1] in ALLOWED_EXTENSIONS
+def createIcon(filename, newname ,size):
+    ratio = size, size
+    im = PIL.Image.open(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+    im.thumbnail(ratio)
+    im.save(os.path.join(app.config['UPLOAD_FOLDER'], newname+'_ICON.jpg'),"JPEG")
+
+    with open(os.path.join(app.config['UPLOAD_FOLDER'], newname+'_ICON.jpg'), "rb") as image_file:
+        encoded_string = base64.b64encode(image_file.read())
+
+    s = str(encoded_string)
+    s = s.replace(s[:2],'')
+    s = s.replace(s[len(s)-1:],'')
+
+    os.remove(os.path.join(app.config['UPLOAD_FOLDER'], newname+'_ICON.jpg'))
+
+    f = open(os.path.join(app.config['UPLOAD_FOLDER'], newname+'_ICON'), 'w')
+    f.write('data:image/jpeg;base64,'+s)
+    f.close()
 
 
 '''----------------------------------------------------------------------------
@@ -623,6 +622,57 @@ def archiveround(scores, roundinprogress_id):
     db.session.delete(roundinprogress)
     db.session.commit()
     return None
+
+
+'''------------
+Insert IMAGE
+'''
+@app.route("/insertimage", methods=['GET'])
+def insertImage():
+    image = Image('hello world')
+    db.session.add(image)
+    db.session.commit()
+    return ("Yeah")
+
+'''---------------------------------------------------------------------------
+SEARCH PLAYERS
+'''
+@app.route("/searchplayers", methods=['GET'])
+def searchfriends():
+    token = request.headers.get('Access-token')
+    player=Player.query.filter_by(access_token=token).first()
+    if player is None:
+        return jsonify({"error": "There exist no user with that access token. please login", "message":"not found", "status":400}),400
+
+    q = request.headers.get('Search-string')
+    if q is None or q == '':
+        return jsonify({"error": "please enter search string", "message":"invalid input", "status":401}),401
+
+    words = divideIntoWords(q)
+    if len(words) == 1:
+        sql = text("select id, first_name, last_name, club_name, hcp, profile_picture_id from player where first_name ilike '"+words[0]+"%' or last_name ilike '"+words[0]+"%' and id != "+str(player.id)+" and id not in (select id2 from friend where id1="+str(player.id)+") order by last_name, first_name limit 20")
+    if len(words) == 2:
+        sql = text("select id, first_name, last_name, club_name, hcp, profile_picture_id from player where (first_name ilike '"+words[0]+"_"+words[1]+"%' or last_name ilike '"+words[0]+"_"+words[1]+"%') or (first_name ilike '"+words[0]+"%' and last_name ilike '"+words[1]+"%') or (last_name ilike '"+words[0]+"%' and first_name ilike '"+words[1]+"%') and id != "+str(player.id)+" and id not in (select id2 from friend where id1="+str(player.id)+") order by last_name, first_name limit 20")
+    if len(words) >= 3:
+        sql = text("select id, first_name, last_name, club_name, hcp, profile_picture_id from player where (first_name ilike '"+words[0]+"_"+words[1]+"_"+words[2]+"%' or last_name ilike '"+words[0]+"_"+words[1]+"_"+words[2]+"%') or (first_name ilike '"+words[0]+"_"+words[1]+"%' and last_name ilike '"+words[2]+"%') or (last_name ilike '"+words[0]+"_"+words[1]+"%' and first_name ilike '"+words[2]+"%') or (first_name ilike '"+words[0]+"%' and last_name ilike '"+words[1]+"_"+words[2]+"%') or (last_name ilike '"+words[0]+"%' and first_name ilike '"+words[1]+"_"+words[2]+"%') and id != "+str(player.id)+" and id not in (select id2 from friend where id1="+str(player.id)+") order by last_name, first_name limit 20")
+
+
+    result = db.engine.execute(sql)
+    names = []
+    for row in result:
+        names.append({"id":row[0], "first_name":row[1], "last_name":row[2], "club_name":row[3], "hcp": row[4], "profile_picture_id":row[5]})
+
+    return jsonify({"search_result": names})
+
+def divideIntoWords(s):
+    words=[]
+    while s.find(' ') > 0:
+        index = s.find(' ')
+        words.append(s[:index])
+        s = s[index+1:]
+
+    words.append(s)
+    return words
 
 
 if __name__ == '__main__':
