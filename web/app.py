@@ -161,11 +161,22 @@ get the picture of specific name (including .jpg or .png etc)
 @app.route('/picture/<pictureId>')
 def get_pitcure(pictureId):
 	try:
-		filename='profilepictures/'+str(pictureId)
-		return send_file(filename, mimetype='image')
+		return send_file(os.path.join(app.config['UPLOAD_FOLDER'], str(pictureId)), mimetype='image')
 	except FileNotFoundError:
 		return jsonify({"error": {"message":"There exist no picture with that id", "type":"not found"}})
 
+'''----------------------------------------------------------------------------
+GET icon
+'''
+@app.route('/geticon', methods=['GET'])
+def geticon():
+    icon_id = request.headers.get('Icon-id')
+    try:
+        f = open(os.path.join(app.config['UPLOAD_FOLDER'], str(icon_id)+'_ICON'), 'r')
+        data = f.read()
+        return jsonify({"icon_id": icon_id, "data": data, "status": 200})
+    except FileNotFoundError:
+        return jsonify({"message":"There exist no picture with that id", "error":"not found", "status":400})
 
 
 '''----------------------------------------------------------------------------------
@@ -230,7 +241,6 @@ def generateAccessToken():
         access_token = str(uuid.uuid4())
 
     return access_token;
-
 
 
 '''---------------------------------------------------------------------------
